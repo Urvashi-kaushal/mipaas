@@ -55,7 +55,8 @@ def create_app(config_name: str | None = None) -> Flask:
     # Register error handlers
     from app.middleware.error_handler import register_error_handlers
     register_error_handlers(app)
-
+    # NEW: registers the admin portal tables (site_admins, site_settings)
+    from app.database.models import site_admin  # noqa: F401
     # Initialize Central Database
     try:
         from app.database import init_db
@@ -77,6 +78,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.routes.eka_portal import eka_bp
     from app.routes.database_admin import database_bp
     from app.routes.indic import indic_bp
+    from app.routes.site_control import site_bp  # NEW
 
     app.register_blueprint(health_bp)
     app.register_blueprint(upload_bp, url_prefix="/api/v1")
@@ -90,6 +92,7 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(eka_bp, url_prefix="/api/v1")
     app.register_blueprint(database_bp, url_prefix="/api/v1")
     app.register_blueprint(indic_bp, url_prefix="/api/v1")
+    app.register_blueprint(site_bp, url_prefix="/api/v1")  # NEW
 
     logger.info(
         "app_initialized",

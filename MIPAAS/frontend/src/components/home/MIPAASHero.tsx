@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import InteractiveEarth from './InteractiveEarth';
 import FeatureCards from './FeatureCards';
@@ -17,71 +16,70 @@ export default function MIPAASHero() {
 
   return (
     <>
-      <section className="relative w-full bg-transparent overflow-hidden pt-6 sm:pt-10 pb-16">
-        {/* Readability scrims: the sky imagery behind the hero is very bright */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-[620px] bg-slate-950/50 [mask-image:linear-gradient(to_bottom,black_70%,transparent_100%)] lg:hidden"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 hidden h-[700px] bg-gradient-to-r from-slate-950/70 via-slate-950/45 to-slate-950/10 [mask-image:linear-gradient(to_bottom,black_85%,transparent_100%)] lg:block"
-        />
+      <section className="relative w-full overflow-hidden bg-gradient-to-b from-[#bfe3f4] via-[#cfeaf7] to-[#e4f3fb] pt-10 sm:pt-16 pb-20 text-slate-800">
+        {/* Clouds / soft light */}
+        <div className="pointer-events-none absolute -left-24 top-40 h-[420px] w-[620px] rounded-full bg-white/50 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-[300px] w-[700px] rounded-full bg-white/60 blur-3xl" />
+        <div className="pointer-events-none absolute right-0 top-20 h-[500px] w-[500px] rounded-full bg-cyan-100/60 blur-3xl" />
 
-        {/* Soft atmospheric daylight radial glow */}
-        <div className="absolute top-1/4 right-[10%] w-[600px] h-[600px] bg-white/20 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-1/3 left-[-5%] w-[500px] h-[500px] bg-sky-200/20 rounded-full blur-[140px] pointer-events-none" />
+        {/* DNA helix top */}
+        <svg className="pointer-events-none absolute -top-10 left-[8%] h-[420px] w-[520px] opacity-40" viewBox="0 0 520 420" fill="none">
+          <path d="M0 380 C120 330 160 120 300 90 S470 40 520 0" stroke="white" strokeWidth="10" strokeLinecap="round" />
+          <path d="M0 330 C140 330 150 160 290 150 S450 70 520 40" stroke="white" strokeWidth="10" strokeLinecap="round" />
+          {Array.from({ length: 14 }).map((_, i) => (
+            <line key={i} x1={20 + i * 36} y1={360 - i * 26} x2={50 + i * 36} y2={320 - i * 26} stroke="white" strokeWidth="3" opacity="0.7" />
+          ))}
+        </svg>
+        {/* DNA helix bottom-left */}
+        <svg className="pointer-events-none absolute -bottom-10 -left-10 h-[420px] w-[420px] opacity-35" viewBox="0 0 420 420" fill="none">
+          <path d="M0 420 C80 300 200 340 260 200 S380 60 420 0" stroke="white" strokeWidth="10" strokeLinecap="round" />
+          <path d="M40 420 C130 340 230 380 290 240 S400 110 420 60" stroke="white" strokeWidth="10" strokeLinecap="round" />
+        </svg>
+        {/* ECG line */}
+        <svg className="pointer-events-none absolute right-[8%] top-16 hidden h-24 w-[620px] opacity-50 lg:block" viewBox="0 0 620 100" fill="none">
+          <path d="M0 55 H120 L135 55 L150 20 L165 85 L180 40 L195 55 H300 L315 55 L330 15 L345 90 L360 35 L375 55 H500 L515 30 L530 70 L545 55 H620" stroke="white" strokeWidth="2" />
+        </svg>
+        {/* Network dots */}
+        <svg className="pointer-events-none absolute right-0 top-0 hidden h-[420px] w-[520px] opacity-60 lg:block" viewBox="0 0 520 420" fill="none">
+          {[[120, 90], [260, 40], [380, 130], [470, 60], [330, 250], [450, 220], [200, 190]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="6" fill="#bfe8f7" stroke="white" strokeWidth="2" />
+          ))}
+          <path d="M120 90 L260 40 L380 130 L470 60 M380 130 L330 250 M380 130 L450 220 M260 40 L200 190 L330 250" stroke="white" strokeWidth="1.2" opacity="0.8" />
+        </svg>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6 items-center min-h-[540px]">
-            {/* Left Column: Hero Typography & Actions */}
+            {/* LEFT */}
             <div className="lg:col-span-6 space-y-6 text-left">
-              {/* Eyebrow / Social Proof Pill: "6k+ happy users" with avatar cluster */}
-              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-950/35 backdrop-blur-md border border-white/30 shadow-xs text-white">
+              <div className="inline-flex items-center gap-2.5 py-1.5 pl-1.5 pr-4 rounded-full bg-slate-400/30 backdrop-blur-md text-slate-700">
                 <div className="flex -space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-300 to-rose-400 ring-2 ring-white/60 flex items-center justify-center text-[10px] font-bold text-slate-700">
-                    S
-                  </div>
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-sky-300 to-blue-500 ring-2 ring-white/60 flex items-center justify-center text-[10px] font-bold text-white">
-                    M
-                  </div>
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-300 to-teal-500 ring-2 ring-white/60 flex items-center justify-center text-[10px] font-bold text-white">
-                    E
-                  </div>
+                  <span className="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-rose-400 ring-2 ring-white/80" />
+                  <span className="w-7 h-7 rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 ring-2 ring-white/80" />
+                  <span className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 ring-2 ring-white/80" />
                 </div>
-                <span className="text-xs sm:text-sm font-semibold tracking-tight text-white drop-shadow-xs">
-                  {t('hero_eyebrow')}
-                </span>
+                <span className="text-xs sm:text-sm font-semibold tracking-tight">{t('hero_eyebrow')}</span>
               </div>
 
-              {/* Main Headline */}
-              <div className="space-y-2">
-                <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-extrabold text-white tracking-tight leading-[1.12] drop-shadow-sm">
-                  {t('hero_headline')}
-                </h1>
-              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-[60px] font-extrabold text-[#0f1f3d] tracking-tight leading-[1.1]">
+                {t('hero_headline')}
+              </h1>
 
-              {/* Supporting Text */}
-              <p className="text-sm sm:text-base text-white max-w-xl font-normal leading-relaxed drop-shadow-md">
+              <p className="text-sm sm:text-base lg:text-lg text-slate-700 max-w-xl leading-relaxed">
                 {t('hero_subtext')}
               </p>
 
-              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-4 pt-2">
-                {/* Primary Button: Dark Pill */}
                 <button
                   type="button"
                   onClick={() => setAuthModalOpen(true)}
-                  className="px-6 sm:px-7 py-3 rounded-full bg-[#111827] hover:bg-black text-white font-bold text-sm sm:text-base shadow-lg shadow-black/15 transition-all cursor-pointer flex items-center gap-2 group hover:scale-[1.02]"
+                  className="px-7 py-3.5 rounded-full bg-[#0f1f3d] hover:bg-[#16294f] text-white font-semibold text-sm sm:text-base shadow-lg transition-all cursor-pointer flex items-center gap-2 group"
                 >
                   <span>{t('hero_get_started')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
-
-                {/* Secondary Button: White Pill */}
                 <a
                   href="#features"
-                  className="px-6 sm:px-7 py-3 rounded-full bg-white hover:bg-slate-50 text-[#111827] font-bold text-sm sm:text-base shadow-md transition-all flex items-center gap-2 group hover:scale-[1.02]"
+                  className="px-7 py-3.5 rounded-full bg-white hover:bg-slate-50 text-[#0f1f3d] font-bold text-sm sm:text-base shadow-md transition-all flex items-center gap-2 group"
                 >
                   <span>{t('hero_explore_pathways')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-slate-400" />
@@ -89,27 +87,25 @@ export default function MIPAASHero() {
               </div>
             </div>
 
-            {/* Right Column: Interactive 3D Earth Globe (Position preserved) */}
+            {/* RIGHT */}
             <div className="lg:col-span-6 relative flex items-center justify-center">
               <InteractiveEarth />
             </div>
           </div>
         </div>
 
-        {/* Conditional Dashboard: Shown ONLY when someone is logged in */}
         {isAuthenticated && (
           <div id="dashboard-preview" className="mt-8 sm:mt-12 animate-in fade-in duration-300">
             <CareviaDashboardPreview />
           </div>
         )}
 
-        {/* 3 Horizontal Feature Cards Beneath Hero (As before on common public homepage) */}
-        <div className="mt-8 sm:mt-12">
+        <div className="mt-8 sm:mt-12 relative z-10">
           <FeatureCards />
+          
         </div>
       </section>
 
-      {/* Multi-Role Authentication Modal */}
       <MultiRoleAuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}

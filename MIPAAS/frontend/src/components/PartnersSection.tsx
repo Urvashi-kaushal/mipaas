@@ -1,46 +1,74 @@
 'use client';
 
-import Image from 'next/image';
-import { useIndicLanguage } from '@/context/IndicLanguageContext';
+import { Cpu, Database, FileImage, ShieldCheck, UserCheck, Lock } from 'lucide-react';
 
-const partnerLogos = [
-  'Fujifilm',
-  'Siemens Healthineers',
-  'Medtronic',
-  'AstraZeneca',
-  'Philips',
-  'Blackford Analysis',
-  'AWS Healthcare',
-  'Microsoft Health',
-  'GE HealthCare',
-  'Roche Diagnostics',
+const technology = [
+  { name: 'TorchXRayVision', note: 'Chest X-ray models (DenseNet-121)' },
+  { name: 'PyTorch', note: 'Deep learning framework' },
+  { name: 'DICOM', note: 'Medical imaging standard' },
+  { name: 'Grad-CAM', note: 'Visual explanations' },
+  { name: 'BraTS', note: 'Brain tumour MRI dataset' },
+  { name: 'ACDC', note: 'Cardiac MRI dataset' },
+  { name: 'HAM10000', note: 'Skin lesion dataset' },
+  { name: 'Next.js', note: 'Web platform' },
 ];
 
-const complianceBadges = [
-  { name: 'CE Mark', src: '/images/ce_mark.webp' },
-  { name: 'EU GDPR', src: '/images/eu_gdpr.webp' },
-  { name: 'HIPAA Compliant', src: '/images/hipaa.webp' },
-  { name: 'FDA Cleared', src: '/images/fda_cleared.webp' },
+const principles = [
+  {
+    icon: UserCheck,
+    title: 'Clinician in control',
+    text: 'AI output is a draft. A doctor reviews, edits and signs every report.',
+  },
+  {
+    icon: Lock,
+    title: 'Role-based access',
+    text: 'Patients, doctors, radiologists and admins only see what their role allows.',
+  },
+  {
+    icon: FileImage,
+    title: 'DICOM-ready',
+    text: 'Imaging studies are ingested in the standard format used by hospitals.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Explainable results',
+    text: 'Probabilities and heatmaps let a clinician check why a finding was flagged.',
+  },
 ];
 
 export default function PartnersSection() {
-  const { t } = useIndicLanguage();
-
   return (
-    <section aria-labelledby="ecosystem-heading" className="border-b border-slate-200/80 bg-white py-16 text-slate-900 md:py-20">
+    <section
+      aria-labelledby="ecosystem-heading"
+      className="border-b border-slate-200/80 bg-white py-16 text-slate-900 md:py-20"
+    >
       <div className="site-container">
         <div className="grid gap-6 md:grid-cols-[1fr_2fr] md:gap-12">
           <div>
-            <p className="eyebrow mb-3 !text-blue-600 font-bold text-xs uppercase tracking-wider">{t('partners_eyebrow')}</p>
-            <h2 id="ecosystem-heading" className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{t('partners_title')}</h2>
+            <p className="eyebrow mb-3 text-xs font-bold uppercase tracking-wider !text-blue-600">
+              Built on open science
+            </p>
+            <h2 id="ecosystem-heading" className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+              Technology behind MiPAAS
+            </h2>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-600">
-              {t('partners_subtitle')}
+              MiPAAS builds on published models, public research datasets and open standards, so its methods can be
+              inspected rather than taken on trust.
             </p>
           </div>
-          <ul aria-label="Listed ecosystem organizations" className="grid grid-cols-2 content-center gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
-            {partnerLogos.map((name) => (
-              <li key={name} className="text-sm font-semibold leading-relaxed text-slate-700 hover:text-blue-600 transition-colors">
-                {name}
+
+                  <ul
+            aria-label="Technology and datasets used"
+            className="flex flex-wrap content-center gap-2.5"
+          >
+            {technology.map((item) => (
+              <li
+                key={item.name}
+                title={item.note}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition-all hover:border-blue-200 hover:bg-white hover:text-blue-600"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                {item.name}
               </li>
             ))}
           </ul>
@@ -48,28 +76,31 @@ export default function PartnersSection() {
 
         <div className="mt-12 grid gap-6 border-t border-slate-200/80 pt-10 md:grid-cols-[1fr_2fr] md:gap-12">
           <div>
-            <h3 className="text-base font-bold text-slate-900">{t('compliance_heading')}</h3>
+            <h3 className="text-base font-bold text-slate-900">Safety and trust principles</h3>
             <p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-600">
-              {t('compliance_desc')}
+              MiPAAS is clinical decision support software. It assists clinicians and does not replace their judgement.
+              Regulatory clearances will be listed here only once they are granted.
             </p>
           </div>
-          <ul aria-label="Illustrative certification and compliance badges" className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {complianceBadges.map((badge) => (
-              <li key={badge.name} className="flex flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 hover:bg-white hover:border-blue-200 hover:shadow-xs px-3 py-4 transition-all">
-                <div className="relative h-9 w-20">
-                  <Image
-                    src={badge.src}
-                    alt=""
-                    fill
-                    sizes="80px"
-                    loading="lazy"
-                    className="object-contain opacity-80"
-                    onError={(event) => { event.currentTarget.style.display = 'none'; }}
-                  />
-                </div>
-                <span className="text-center text-xs font-semibold text-slate-700">{badge.name}</span>
-              </li>
-            ))}
+
+          <ul aria-label="Design principles" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {principles.map((p) => {
+              const Icon = p.icon;
+              return (
+                <li
+                  key={p.title}
+                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-4 transition-all hover:border-blue-200 hover:bg-white hover:shadow-sm"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-800">{p.title}</div>
+                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{p.text}</p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

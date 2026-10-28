@@ -5,9 +5,12 @@ import Link from 'next/link';
 import { ArrowRight, Search, ShieldAlert, Activity, Layers } from 'lucide-react';
 import { useServices } from '@/context/ServicesContext';
 import { useIndicLanguage } from '@/context/IndicLanguageContext';
+import { useSiteFlags, isPathwayVisible } from '@/lib/siteSettings';
 
 export default function PathwaysSection() {
-  const { homepageServices, isLoading } = useServices();
+   const { homepageServices: allHomepageServices, isLoading } = useServices();
+  const siteFlags = useSiteFlags();
+  const homepageServices = allHomepageServices.filter((s) => isPathwayVisible(siteFlags, s.id));
   const { t } = useIndicLanguage();
   const [query, setQuery] = useState('');
   const [modality, setModality] = useState('All pathways');

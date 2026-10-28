@@ -18,6 +18,21 @@ import {
   Info
 } from 'lucide-react';
 import MultiRoleAuthModal from '@/components/auth/MultiRoleAuthModal';
+// Picture-perfect hero: no patient dots / arcs on the globe
+const SHOW_PATIENT_DOTS = false;
+
+function GlassCard({ img, className = '' }: { img: string; className?: string }) {
+  return (
+    <div
+      className={`absolute z-20 rounded-2xl border border-white/70 bg-white/30 p-1.5 shadow-[0_10px_40px_rgba(14,116,144,0.25)] backdrop-blur-md pointer-events-none ${className}`}
+    >
+      <div
+        className="h-full w-full rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 bg-cover bg-center"
+        style={{ backgroundImage: `url('${img}')` }}
+      />
+    </div>
+  );
+}
 
 export interface DatasetPatient {
   id: string;
@@ -709,7 +724,7 @@ export default function InteractiveEarth() {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+       renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
 
     // Group for the Earth and all patient markers
@@ -724,14 +739,15 @@ export default function InteractiveEarth() {
     const textureLoader = new THREE.TextureLoader();
     const fallbackTexture = createRealisticEarthTexture();
 
-    const earthDayTexture = textureLoader.load(
+        const earthDayTexture = textureLoader.load(
       '/images/earth_daymap.jpg',
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
       },
       undefined,
       () => {
-        // Fallback gracefully if network issue
+        earthMaterial.map = fallbackTexture;
+        earthMaterial.needsUpdate = true;
       }
     );
     earthDayTexture.colorSpace = THREE.SRGBColorSpace;
@@ -756,11 +772,18 @@ export default function InteractiveEarth() {
     // 4. Realistic Cloud Layer with Authentic Cloud Texture
     const cloudGeometry = new THREE.SphereGeometry(earthRadius * 1.014, 64, 64);
     const fallbackCloud = createRealisticCloudTexture();
-    const cloudTexture = textureLoader.load(
+       const cloudTexture = textureLoader.load(
       '/images/earth_clouds.png',
       undefined,
       undefined,
-      () => {}
+      () => {
+        cloudMesh.material = new THREE.MeshLambertMaterial({
+          map: fallbackCloud,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+        });
+      }
     );
     cloudTexture.wrapS = THREE.RepeatWrapping;
 
@@ -800,10 +823,10 @@ export default function InteractiveEarth() {
     scene.add(atmosphereMesh);
 
     // 6. Natural Directional Sunlight & Luminous Daytime Sky Ambiance
-    const ambientLight = new THREE.AmbientLight(0xdbeafe, 2.4);
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 1.2);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 3.2);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 2.4);
     sunLight.position.set(300, 180, 280);
     scene.add(sunLight);
 
@@ -1169,71 +1192,50 @@ export default function InteractiveEarth() {
         />
       )}
 
-      {/* Floating Medical Badges matching Carevia Theme */}
-      {/* Node 1: Medical Cross */}
-      <div className="absolute top-[16%] left-[16%] sm:left-[20%] z-20 pointer-events-none">
-        <div className="w-11 h-11 rounded-full bg-white/90 border border-white/80 shadow-[0_8px_20px_rgba(30,58,138,0.12)] flex items-center justify-center backdrop-blur-md">
-          <span className="text-blue-600 font-black text-lg leading-none">+</span>
-        </div>
-      </div>
+           <style>{`
+        @keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes heart-beat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+        .float-slow { animation: float-y 7s ease-in-out infinite; }
+        .float-slower { animation: float-y 9s ease-in-out infinite reverse; }
+        .heart-beat { animation: heart-beat 1.6s ease-in-out infinite; transform-origin: center; }
+      `}</style>
 
-      {/* Node 2: Heartbeat Pulse */}
-      <div className="absolute top-[12%] right-[14%] sm:right-[18%] z-20 pointer-events-none">
-        <div className="w-11 h-11 rounded-full bg-white/90 border border-white/80 shadow-[0_8px_20px_rgba(30,58,138,0.12)] flex items-center justify-center backdrop-blur-md">
-          <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      <div className="pointer-events-none absolute inset-[3%] rounded-full border border-white/50" />
+
+      <GlassCard img="/images/hero/xray-chest.jpg" className="float-slower right-[2%] top-[2%] h-[34%] w-[26%] rotate-[6deg]" />
+      <GlassCard img="/images/hero/mri-brain.jpg" className="float-slow right-[-2%] top-[46%] h-[26%] w-[22%] rotate-[4deg]" />
+      <GlassCard img="/images/hero/ct-abdomen.jpg" className="float-slower bottom-[6%] right-[14%] h-[22%] w-[24%] rotate-[-4deg]" />
+      <GlassCard img="/images/hero/xray-knee.jpg" className="float-slow bottom-[2%] left-[16%] h-[26%] w-[17%] rotate-[-6deg]" />
+      <GlassCard img="/images/hero/xray-spine.jpg" className="float-slower bottom-[12%] left-[0%] h-[22%] w-[11%] rotate-[-8deg]" />
+
+      <div className="float-slow pointer-events-none absolute left-[22%] top-[36%] z-30 w-[38%] rounded-2xl border border-cyan-200/70 bg-[#0b2a4f]/70 p-3 shadow-[0_10px_50px_rgba(14,165,233,0.5)] backdrop-blur-md">
+        <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-cyan-100">
+          <span>AI Processing Active</span>
+          <span className="h-1.5 w-10 rounded bg-cyan-200/40" />
+        </div>
+        <div className="relative flex h-28 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-[#0e3b66]/80 to-[#0a2547]/90">
+          <span className="absolute left-2 top-2 text-[9px] font-semibold leading-tight text-white">
+            3D Heart<br />Reconstruction
+          </span>
+          <svg viewBox="0 0 100 100" className="heart-beat h-20 w-20 drop-shadow-[0_0_14px_rgba(248,113,113,0.8)]">
+            <defs>
+              <radialGradient id="hg" cx="50%" cy="45%" r="60%">
+                <stop offset="0%" stopColor="#fecaca" />
+                <stop offset="45%" stopColor="#f87171" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#7dd3fc" stopOpacity="0.6" />
+              </radialGradient>
+            </defs>
+            <path d="M50 88 C20 62 10 42 18 28 C26 14 44 16 50 30 C56 16 74 14 82 28 C90 42 80 62 50 88Z" fill="url(#hg)" stroke="#e0f2fe" strokeWidth="1.5" />
           </svg>
         </div>
       </div>
 
-      {/* Node 3: DNA Helix */}
-      <div className="absolute top-[40%] right-[4%] sm:right-[7%] z-20 pointer-events-none">
-        <div className="w-10 h-10 rounded-full bg-white/90 border border-white/80 shadow-[0_8px_18px_rgba(30,58,138,0.12)] flex items-center justify-center backdrop-blur-md">
-          <svg className="w-5 h-5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v18M15 3v18M4 9h16M4 15h16" />
-          </svg>
-        </div>
-      </div>
+      <span className="pointer-events-none absolute right-[10%] top-[40%] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-bold text-emerald-500 shadow-lg">#</span>
+      <span className="pointer-events-none absolute left-[12%] top-[48%] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white text-sky-600 shadow-lg">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="12" height="17" rx="2" /><path d="M9 4h6v3H9z" /></svg>
+      </span>
 
-      {/* Node 4: Clinical Clipboard */}
-      <div className="absolute top-[48%] left-[10%] sm:left-[14%] z-20 pointer-events-none">
-        <div className="w-10 h-10 rounded-full bg-white/90 border border-white/80 shadow-[0_8px_18px_rgba(30,58,138,0.12)] flex items-center justify-center backdrop-blur-md">
-          <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Node 5: Hospital Facility */}
-      <div className="absolute bottom-[20%] right-[16%] sm:right-[20%] z-20 pointer-events-none">
-        <div className="w-11 h-11 rounded-full bg-white/90 border border-white/80 shadow-[0_8px_20px_rgba(30,58,138,0.12)] flex items-center justify-center backdrop-blur-md">
-          <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        </div>
-      </div>
-
-      {/* Floating Data Card: "Better Data / Brighter Healthcare / Healthier Lives" */}
-      <div className="absolute bottom-[22%] right-[4%] sm:right-[6%] z-20 p-3 sm:p-4 rounded-2xl bg-white/90 border border-white/80 shadow-[0_12px_32px_rgba(30,58,138,0.12)] backdrop-blur-md pointer-events-none text-left">
-        <div className="text-xs sm:text-sm font-bold text-blue-600 leading-tight">Better Data</div>
-        <div className="text-xs sm:text-sm font-bold text-slate-800 leading-tight">Brighter Healthcare</div>
-        <div className="text-xs sm:text-sm font-bold text-teal-600 leading-tight">Healthier Lives</div>
-      </div>
-
-      {/* Interactive Helper Banner */}
-      {!webglUnavailable && (
-        <div className="hidden sm:flex absolute bottom-2 left-4 z-10 text-[11px] text-slate-600 bg-white/85 px-3 py-1.5 rounded-full border border-white/80 shadow-xs pointer-events-none items-center gap-1.5 backdrop-blur-md">
-          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-          <span>Click a patient dot for details</span>
-        </div>
-      )}
-
-      {/* Dataset Legend */}
-      <div className="absolute bottom-2 right-4 z-10 text-[11px] font-mono text-slate-600 bg-white/85 px-3 py-1.5 rounded-full border border-white/80 shadow-xs pointer-events-none backdrop-blur-md">
-        <span className="w-2 h-2 rounded-full bg-blue-600 inline-block mr-1.5 animate-pulse" />
-        {DATASET_PATIENTS.length} mapped patients
-      </div>
-
+      <span className="pointer-events-none absolute right-[-3%] top-[76%] z-30 text-[10px] font-medium leading-tight text-sky-900">DICOM<br />Multi-Modal</span>
       {/* ==============================================================
           INTERACTIVE PATIENT POP-UP CARD (Triggered when clicking a dot)
          ============================================================== */}

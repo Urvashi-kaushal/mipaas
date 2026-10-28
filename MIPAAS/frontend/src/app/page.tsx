@@ -6,6 +6,7 @@ import ImpactSection from "@/components/ImpactSection";
 import DevelopmentsSection from "@/components/DevelopmentsSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import Footer from "@/components/Footer";
+import Show from "@/components/common/Show";
 
 export default function Home() {
   return (
@@ -23,22 +24,21 @@ export default function Home() {
         </div>
 
         <div id="solutions">
-          <PartnersSection />
+          <Show flag="section_partners"><PartnersSection /></Show>
         </div>
 
         <div id="features">
-          <PathwaysSection />
+         <Show flag="section_pathways"><PathwaysSection /></Show>
         </div>
 
         <div id="product">
-          <ImpactSection />
+       <Show flag="section_impact"><ImpactSection /></Show>
         </div>
 
         <div id="pricing">
-          <DevelopmentsSection />
+       <Show flag="section_developments"><DevelopmentsSection /></Show>
         </div>
-
-        <TestimonialsSection />
+<Show flag="section_testimonials"><TestimonialsSection /></Show>
       </main>
 
       {/* Footer */}
