@@ -8,6 +8,7 @@ import { useRBAC } from "@/context/RBACContext";
 import { useIndicLanguage } from "@/context/IndicLanguageContext";
 import IndicLanguageSelector from "@/components/common/IndicLanguageSelector";
 import { useSiteFlags, isPathwayVisible } from "@/lib/siteSettings";
+import AdminPortalButton from '@/components/common/AdminPortalButton';
 
 export interface ProductItem {
   id: string;
@@ -315,6 +316,7 @@ export default function Navbar() {
         </div>
         <div className="desktop-navigation nav-actions flex items-center gap-2 sm:gap-3">
           <IndicLanguageSelector />
+             <AdminPortalButton />
           {isAuthenticated && currentUser && currentUser.id ? (
             <div className="flex items-center gap-3">
               {/* Authenticated User Profile Pill */}
@@ -326,6 +328,7 @@ export default function Navbar() {
                   title={`Signed in as ${currentUser.name}`}
                 >
                   <span
+                  
                     className={`w-2 h-2 rounded-full ${isDoctor ? "bg-[#00DCCE]" : isPatient ? "bg-emerald-400" : "bg-slate-400"}`}
                   />
                   <span className="font-semibold text-[11px] truncate max-w-[140px]">
@@ -347,6 +350,9 @@ export default function Navbar() {
                         {currentUser.email || currentUser.roleTitle}
                       </div>
                       <div className="mt-2.5 flex items-center gap-2">
+          <div onClick={closeMobile} className="px-4 py-2">
+          <AdminPortalButton className="block w-full text-center rounded-xl border border-white/25 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10" />
+               </div>
                         {isDoctor && (
                           <Link
                             href="/doctor"

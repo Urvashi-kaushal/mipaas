@@ -7,62 +7,39 @@ import { UserProfile, ROLE_DEFINITIONS } from '@/types/rbac';
 import { clinicalApiService } from '@/services/clinicalApiService';
 import { iamAuthService } from '@/services/iamAuthService';
 import { DEMO_AUTH_ENABLED } from '@/lib/demoMode';
-import {
-  X,
-  Heart,
-  Stethoscope,
-  ShieldCheck,
-  Lock,
-  Mail,
-  User,
-  Phone,
-  Calendar,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  AlertCircle,
-  ArrowRight,
-  ShieldAlert
-} from 'lucide-react';
+import { adminLogin } from '@/lib/siteSettings';
+import { X, Heart, UserPlus, User, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 
 interface MultiRoleAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialRole?: 'patient' | 'doctor' | 'admin';
+  initialRole?: 'patient' | 'doctor' | 'admin'; // kept so existing pages still work; the role is now worked out from the sign-in
   initialMode?: 'login' | 'register';
 }
 
-export default function MultiRoleAuthModal({
-  isOpen,
-  onClose,
-  initialRole = 'patient',
-  initialMode = 'login',
-}: MultiRoleAuthModalProps) {
+const inputCls =
+  'w-full pl-10 pr-3 py-2.5 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5] focus:ring-1 focus:ring-[#16d9f5]';
+
+const toName = (value: string) =>
+  value
+    .split('@')[0]
+    .split('.')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+export default function MultiRoleAuthModal({ isOpen, onClose, initialMode = 'login' }: MultiRoleAuthModalProps) {
   const router = useRouter();
-  const { switchPersona, loginWithCustomProfile, loginWithIAM, currentUser } = useRBAC();
+  const { switchPersona, loginWithCustomProfile, loginWithIAM } = useRBAC();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [selectedRole, setSelectedRole] = useState<'patient' | 'doctor' | 'admin'>(initialRole);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
-
-  // Form states
-  const [email, setEmail] = useState('');
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Patient registration fields
-  const [registerForm, setRegisterForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    dob: '',
-    password: '',
-    confirmPassword: '',
-    consent: false,
-  });
+  const [success, setSuccess] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [reg, setReg] = useState({ fullName: '', email: '', password: '', confirmPassword: '', consent: false });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,105 +58,78 @@ export default function MultiRoleAuthModal({
 
   if (!isOpen) return null;
 
-  const handleRoleSelect = (role: 'patient' | 'doctor' | 'admin') => {
-    setSelectedRole(role);
+  const switchMode = (next: 'login' | 'register') => {
+    setMode(next);
     setError(null);
-    setSuccessMsg(null);
-    // Only patient has public registration
-    if (role !== 'patient' && authMode === 'register') {
-      setAuthMode('login');
-    }
-    // Clear inputs on role change
-    setEmail('');
-    setPassword('');
+    setSuccess(null);
   };
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const finish = (message: string, path: string) => {
+    setSuccess(message);
+    setTimeout(() => {
+      setLoading(false);
+      onClose();
+      router.push(path);
+    }, 900);
+  };
+
+  /* ---------- LOGIN ---------- */
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true);
+    setSuccess(null);
+    setLoading(true);
+
+    const id = identifier.trim();
+    const lower = id.toLowerCase();
 
     try {
-      if (!DEMO_AUTH_ENABLED) {
-        const res = await iamAuthService.loginRole({
-          role: selectedRole,
-          identifier: email,
-          password,
-        });
-        if (!res.success || !res.data?.user) {
-          throw new Error(res.message || 'Incorrect credentials for the selected role.');
-        }
-        loginWithIAM(res.data.user);
-        const mappedRole = iamAuthService.mapIamUserToClinicalProfile(res.data.user).role;
-        const targetPath = mappedRole === 'patient' ? '/patient' : mappedRole === 'doctor' || mappedRole === 'radiologist' ? '/doctor' : '/admin';
-        setSuccessMsg(`Signed in as ${res.data.user.username}. Redirecting...`);
-        setTimeout(() => {
-          setIsLoading(false);
-          onClose();
-          router.push(targetPath);
-        }, 800);
+      // 1. Site administrators: the admin ID is checked against the MiPAAS database
+      try {
+        const r = await adminLogin(id, password);
+        sessionStorage.setItem('mipaas_admin_token', r.token);
+        sessionStorage.setItem('mipaas_admin_id', r.admin_id);
+        finish(`Signed in as ${r.admin_id}. Opening the Site Control portal...`, '/admin/portal');
         return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '';
+        // An ID without "@" can only be an admin ID, so show the admin error. An email carries on as patient or doctor.
+        if (/too many/i.test(message) || !id.includes('@')) throw err;
       }
 
-      const lowerEmail = email.toLowerCase().trim();
-
-      if (selectedRole === 'patient') {
-        if (lowerEmail.includes('alex.taylor')) {
-          switchPersona('pat-01');
-          setSuccessMsg('Authenticated as Alex Taylor. Redirecting to Patient Portal...');
-        } else {
-          // Check backend patients or derive clean display name
-          const pts = await clinicalApiService.getPatients().catch(() => []);
-          const matchedPt = pts.find((p) => p.email && p.email.toLowerCase() === lowerEmail);
-          const rawName = matchedPt
-            ? matchedPt.name
-            : lowerEmail
-                .split('@')[0]
-                .split('.')
-                .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-                .join(' ');
-          const displayName = rawName || 'Patient User';
-
-          const userProfile: UserProfile = {
-            id: matchedPt?.id || `pat-${Date.now().toString(36)}`,
-            name: displayName,
-            email: lowerEmail,
-            role: 'patient',
-            roleTitle: 'Registered Patient',
-            department: 'Primary Care',
-            organization: 'CareNest Health System',
-            permissions: ROLE_DEFINITIONS.patient.permissions,
-          };
-
-          // If no chart exists yet in backend, automatically create one for them
-          if (!matchedPt) {
-            await clinicalApiService.createPatient({
-              name: displayName,
-              email: lowerEmail,
-              primaryDiagnosis: 'General Clinical Intake',
-            }).catch(() => null);
+      // 2. Patients and doctors, using the real login server
+      if (!DEMO_AUTH_ENABLED) {
+        let lastError = 'Incorrect email or password.';
+        for (const role of ['doctor', 'patient'] as const) {
+          try {
+            const res = await iamAuthService.loginRole({ role, identifier: id, password });
+            if (res.success && res.data?.user) {
+              loginWithIAM(res.data.user);
+              const mapped = iamAuthService.mapIamUserToClinicalProfile(res.data.user).role;
+              const path = mapped === 'patient' ? '/patient' : mapped === 'doctor' || mapped === 'radiologist' ? '/doctor' : '/admin';
+              finish(`Signed in as ${res.data.user.username}. Redirecting...`, path);
+              return;
+            }
+          } catch (err) {
+            const message = err instanceof Error ? err.message : '';
+            if (/unavailable/i.test(message)) {
+              lastError = message;
+              break;
+            }
           }
-
-          loginWithCustomProfile(userProfile);
-          setSuccessMsg(`Welcome back, ${displayName}! Redirecting to Patient Portal...`);
         }
+        throw new Error(lastError);
+      }
 
-        setTimeout(() => {
-          setIsLoading(false);
-          onClose();
-          router.push('/patient');
-        }, 1000);
-      } else if (selectedRole === 'doctor') {
-        const rawName = lowerEmail
-          .split('@')[0]
-          .split('.')
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(' ');
-        const displayName = rawName ? (rawName.toLowerCase().startsWith('dr') ? rawName : `Dr. ${rawName}`) : 'Attending Physician';
+      // 3. Demo mode: the role is worked out from the email
+      const looksLikeDoctor = /doctor|physician|^dr[.\-_]|[.\-_]dr[.\-_@]/i.test(id);
+
+      if (looksLikeDoctor) {
+        const displayName = toName(lower) ? (toName(lower).toLowerCase().startsWith('dr') ? toName(lower) : `Dr. ${toName(lower)}`) : 'Attending Physician';
         const doctorProfile: UserProfile = {
           id: `doc-${Date.now().toString(36)}`,
           name: displayName,
-          email: lowerEmail,
+          email: lower,
           role: 'doctor',
           roleTitle: 'Attending Physician',
           department: 'Clinical Medicine',
@@ -187,150 +137,112 @@ export default function MultiRoleAuthModal({
           permissions: ROLE_DEFINITIONS.doctor.permissions,
         };
         loginWithCustomProfile(doctorProfile);
-        setSuccessMsg(`Welcome, ${displayName}! Redirecting to Doctor Portal...`);
-        setTimeout(() => {
-          setIsLoading(false);
-          onClose();
-          router.push('/doctor');
-        }, 1000);
-      } else if (selectedRole === 'admin') {
-        if (lowerEmail.includes('arthur.davis') || lowerEmail.includes('admin-01')) {
-          switchPersona('admin-01');
-          setSuccessMsg('Authenticated as Arthur Davis, CISSP. Redirecting to Admin Console...');
-        } else {
-          const rawName = lowerEmail
-            .split('@')[0]
-            .split('.')
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(' ');
-          const displayName = rawName || 'System Administrator';
-          const adminProfile: UserProfile = {
-            id: `admin-${Date.now().toString(36)}`,
-            name: displayName,
-            email: lowerEmail,
-            role: 'admin',
-            roleTitle: 'Compliance & Security Officer',
-            department: 'Health Informatics & Security',
-            organization: 'CareNest Health System',
-            permissions: ROLE_DEFINITIONS.admin.permissions,
-          };
-          loginWithCustomProfile(adminProfile);
-          setSuccessMsg(`Authenticated as ${displayName}. Redirecting to Admin Console...`);
+        finish(`Welcome, ${displayName}! Redirecting to the Doctor Portal...`, '/doctor');
+      } else if (lower.includes('alex.taylor')) {
+        switchPersona('pat-01');
+        finish('Welcome back, Alex Taylor! Redirecting to your Patient Portal...', '/patient');
+      } else {
+        const pts = await clinicalApiService.getPatients().catch(() => []);
+        const matchedPt = pts.find((p) => p.email && p.email.toLowerCase() === lower);
+        const displayName = matchedPt ? matchedPt.name : toName(lower) || 'Patient User';
+        const userProfile: UserProfile = {
+          id: matchedPt?.id || `pat-${Date.now().toString(36)}`,
+          name: displayName,
+          email: lower,
+          role: 'patient',
+          roleTitle: 'Registered Patient',
+          department: 'Primary Care',
+          organization: 'CareNest Health System',
+          permissions: ROLE_DEFINITIONS.patient.permissions,
+        };
+        if (!matchedPt) {
+          await clinicalApiService
+            .createPatient({ name: displayName, email: lower, primaryDiagnosis: 'General Clinical Intake' })
+            .catch(() => null);
         }
-        setTimeout(() => {
-          setIsLoading(false);
-          onClose();
-          router.push('/admin');
-        }, 1000);
+        loginWithCustomProfile(userProfile);
+        finish(`Welcome back, ${displayName}! Redirecting to your Patient Portal...`, '/patient');
       }
     } catch (err: unknown) {
-      setIsLoading(false);
-      setError((err instanceof Error ? err.message : String(err)) || 'Failed to authenticate.');
+      setLoading(false);
+      setError((err instanceof Error ? err.message : String(err)) || 'Failed to sign in.');
     }
   };
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
+  /* ---------- SIGN UP (patients) ---------- */
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validation
-    const cleanName = registerForm.fullName.trim();
-    const cleanEmail = registerForm.email.trim();
-    const cleanPhone = registerForm.phone.trim() || '(555) 019-2000';
-    const cleanDob = registerForm.dob || '1992-06-14';
+    const name = reg.fullName.trim();
+    const email = reg.email.trim();
+    const phone = '(555) 019-2000';
+    const dob = '1992-06-14';
 
-    if (!cleanName) {
-      setError('Please enter your full legal name.');
+    if (!name) {
+      setError('Please enter your full name.');
       return;
     }
-    if (!cleanEmail.includes('@')) {
+    if (!email.includes('@')) {
       setError('Please enter a valid email address.');
       return;
     }
-    if (registerForm.password.length < 8) {
+    if (reg.password.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
     }
-    if (registerForm.password !== registerForm.confirmPassword) {
+    if (reg.password !== reg.confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
-    if (!registerForm.consent) {
-      setError('You must agree to the HIPAA Privacy Policy and Terms of Care.');
+    if (!reg.consent) {
+      setError('You must agree to the privacy terms to create an account.');
       return;
     }
 
-    setIsLoading(true);
-
+    setLoading(true);
     try {
-      if (!DEMO_AUTH_ENABLED) {
-        const res = await iamAuthService.registerPatient({
-          fullName: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          dob: cleanDob,
-          password: registerForm.password,
-          consent: registerForm.consent,
-        });
-        if (!res.success || !res.data?.user) {
-          throw new Error(res.message || 'Patient registration failed.');
-        }
-        await clinicalApiService.createPatient({
-          name: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          dob: cleanDob,
-          age: 32,
-          gender: 'Not specified',
-          bloodType: 'O+',
-          primaryDiagnosis: 'Patient Self-Registered · Initial Assessment Scheduled',
-        }).catch(() => null);
-        loginWithIAM(res.data.user);
-        setSuccessMsg(`Account created for ${cleanName}! Redirecting to your health portal...`);
-        setTimeout(() => {
-          setIsLoading(false);
-          onClose();
-          router.push('/patient');
-        }, 1000);
-        return;
-      }
-
-      // 1. Create patient record in backend clinical database so doctor workstation has their chart immediately
-      await clinicalApiService.createPatient({
-        name: cleanName,
-        email: cleanEmail,
-        phone: cleanPhone,
-        dob: cleanDob,
+      const patientRecord = {
+        name,
+        email,
+        phone,
+        dob,
         age: 32,
         gender: 'Not specified',
         bloodType: 'O+',
         primaryDiagnosis: 'Patient Self-Registered · Initial Assessment Scheduled',
-      });
-
-      // 2. Create UserProfile for authenticated session
-      const newProfile: UserProfile = {
-        id: `pat-${Date.now().toString(36)}`,
-        name: cleanName,
-        email: cleanEmail,
-        role: 'patient',
-        roleTitle: 'Registered Patient',
-        department: 'Primary Care',
-        organization: 'CareNest Health System',
-        permissions: ROLE_DEFINITIONS.patient.permissions,
       };
 
-      // 3. Log in with custom profile
-      loginWithCustomProfile(newProfile);
-      setSuccessMsg(`Account created for ${cleanName}! Redirecting to your personal health portal...`);
-
-      setTimeout(() => {
-        setIsLoading(false);
-        onClose();
-        router.push('/patient');
-      }, 1000);
+      if (!DEMO_AUTH_ENABLED) {
+        const res = await iamAuthService.registerPatient({
+          fullName: name,
+          email,
+          phone,
+          dob,
+          password: reg.password,
+          consent: reg.consent,
+        });
+        if (!res.success || !res.data?.user) throw new Error(res.message || 'Patient registration failed.');
+        await clinicalApiService.createPatient(patientRecord).catch(() => null);
+        loginWithIAM(res.data.user);
+      } else {
+        await clinicalApiService.createPatient(patientRecord);
+        const newProfile: UserProfile = {
+          id: `pat-${Date.now().toString(36)}`,
+          name,
+          email,
+          role: 'patient',
+          roleTitle: 'Registered Patient',
+          department: 'Primary Care',
+          organization: 'CareNest Health System',
+          permissions: ROLE_DEFINITIONS.patient.permissions,
+        };
+        loginWithCustomProfile(newProfile);
+      }
+      finish(`Account created for ${name}! Redirecting to your health portal...`, '/patient');
     } catch (err: unknown) {
-      setIsLoading(false);
-      setError((err instanceof Error ? err.message : String(err)) || 'Failed to register account.');
+      setLoading(false);
+      setError((err instanceof Error ? err.message : String(err)) || 'Failed to create the account.');
     }
   };
 
@@ -339,10 +251,9 @@ export default function MultiRoleAuthModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="multi-role-auth-title"
-        className="bg-[#051322] border border-[#16d9f5]/35 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-[0_20px_60px_rgba(2,11,20,0.9)] relative text-white max-h-[90vh] overflow-y-auto"
+        aria-labelledby="auth-title"
+        className="bg-[#051322] border border-[#16d9f5]/35 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-[0_20px_60px_rgba(2,11,20,0.9)] relative text-white max-h-[90vh] overflow-y-auto"
       >
-        {/* Close Button */}
         <button
           ref={closeButtonRef}
           type="button"
@@ -353,291 +264,219 @@ export default function MultiRoleAuthModal({
           <X className="w-5 h-5" />
         </button>
 
-        {/* Modal Header */}
+        {/* Header */}
         <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-[#0b2844] border border-[#16d9f5]/40 text-[#16d9f5] mx-auto flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(22,217,245,0.3)]">
-            {selectedRole === 'patient' && <Heart className="w-6 h-6 fill-[#16d9f5]/20" />}
-            {selectedRole === 'doctor' && <Stethoscope className="w-6 h-6" />}
-            {selectedRole === 'admin' && <ShieldCheck className="w-6 h-6" />}
+            {mode === 'login' ? <Heart className="w-6 h-6 fill-[#16d9f5]/20" /> : <UserPlus className="w-6 h-6" />}
           </div>
-          <h2 id="multi-role-auth-title" className="text-xl sm:text-2xl font-black tracking-tight text-white">
-            {authMode === 'register' ? 'Create Patient Account' : DEMO_AUTH_ENABLED ? 'MiPAAS Demo Workspace Access' : 'MiPAAS Healthcare Access'}
+          <h2 id="auth-title" className="text-2xl font-black tracking-tight text-[#16d9f5]">
+            {mode === 'login' ? 'Welcome Back' : 'Create Your Account'}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            {authMode === 'register'
-              ? 'Enroll in your personal digital health portal'
-              : 'Select your clinical role to sign in to your authorized workspace'}
+          <p className="text-sm text-slate-400 mt-1">
+            {mode === 'login' ? 'Sign in to your MiPAAS account' : 'Create your personal health portal account'}
           </p>
         </div>
 
-        {DEMO_AUTH_ENABLED && authMode === 'login' && (
+        {DEMO_AUTH_ENABLED && mode === 'login' && (
           <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
-            Demo mode: credentials are not verified and role selection is simulated. Do not enter real patient information.
+            Demo mode: patient and doctor credentials are not verified. Do not enter real patient information.
           </div>
         )}
 
-        {/* 3 Role Selection Cards */}
-        {authMode === 'login' && (
-          <div className="grid grid-cols-3 gap-2.5 mb-6">
-            <button
-              type="button"
-              onClick={() => handleRoleSelect('patient')}
-              className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                selectedRole === 'patient'
-                  ? 'bg-[#16d9f5]/15 border-[#16d9f5] text-white shadow-[0_0_15px_rgba(22,217,245,0.3)] font-bold'
-                  : 'bg-[#081f36]/60 border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              <Heart className={`w-5 h-5 ${selectedRole === 'patient' ? 'text-[#16d9f5]' : 'text-slate-400'}`} />
-              <span className="text-xs">Patient</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleRoleSelect('doctor')}
-              className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                selectedRole === 'doctor'
-                  ? 'bg-[#16d9f5]/15 border-[#16d9f5] text-white shadow-[0_0_15px_rgba(22,217,245,0.3)] font-bold'
-                  : 'bg-[#081f36]/60 border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              <Stethoscope className={`w-5 h-5 ${selectedRole === 'doctor' ? 'text-[#16d9f5]' : 'text-slate-400'}`} />
-              <span className="text-xs">Doctor</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleRoleSelect('admin')}
-              className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                selectedRole === 'admin'
-                  ? 'bg-[#16d9f5]/15 border-[#16d9f5] text-white shadow-[0_0_15px_rgba(22,217,245,0.3)] font-bold'
-                  : 'bg-[#081f36]/60 border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
-              }`}
-            >
-              <ShieldCheck className={`w-5 h-5 ${selectedRole === 'admin' ? 'text-[#16d9f5]' : 'text-slate-400'}`} />
-              <span className="text-xs">Admin</span>
-            </button>
-          </div>
-        )}
-
-        {/* Feedback Alerts */}
         {error && (
-          <div className="p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+          <div role="alert" className="p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
-        {successMsg && (
-          <div className="p-3 mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+        {success && (
+          <div role="status" className="p-3 mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>{successMsg}</span>
+            <span>{success}</span>
           </div>
         )}
 
-        {/* LOGIN FORM */}
-        {authMode === 'login' ? (
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs sm:text-sm">
+        {mode === 'login' ? (
+          /* ---------- LOGIN FORM ---------- */
+          <form onSubmit={handleLogin} className="space-y-4 text-sm">
             <div>
-              <label className="block text-slate-300 font-medium mb-1.5">
-                {selectedRole === 'patient'
-                  ? 'Patient Email or MRN'
-                  : selectedRole === 'doctor'
-                  ? 'Doctor Email or NPI'
-                  : 'Administrator Username'}
+              <label htmlFor="auth-id" className="block text-slate-300 font-medium mb-1.5">
+                Email or ID
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
+                  id="auth-id"
                   type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={
-                    selectedRole === 'patient'
-                      ? 'patient@carenest.health'
-                      : selectedRole === 'doctor'
-                      ? 'doctor@mipaas.health'
-                      : 'admin@mipaas.health'
-                  }
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Enter your email or ID"
+                  autoComplete="username"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5] focus:ring-1 focus:ring-[#16d9f5]"
+                  className={inputCls}
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="text-slate-300 font-medium">Password</label>
+              <label htmlFor="auth-password" className="block text-slate-300 font-medium mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="auth-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  required
+                  className={`${inputCls} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="mt-2 text-right">
                 <button
                   type="button"
                   onClick={() => {
                     setError(null);
-                    setSuccessMsg('If an account exists for this email, a password reset link will be sent.');
+                    setSuccess('If an account exists for this email, a password reset link will be sent.');
                   }}
                   className="text-xs text-[#16d9f5] hover:underline"
                 >
                   Forgot password?
                 </button>
               </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5] focus:ring-1 focus:ring-[#16d9f5]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
             </div>
-
-            {/* Role Notice */}
-            {selectedRole === 'doctor' && (
-              <p className="text-[11px] text-slate-400 leading-relaxed bg-[#0b2742]/50 p-2.5 rounded-xl border border-white/5">
-                🔒 Doctor workstation is restricted to verified healthcare professionals with valid clinical credentials.
-              </p>
-            )}
-            {selectedRole === 'admin' && (
-              <p className="text-[11px] text-slate-400 leading-relaxed bg-[#0b2742]/50 p-2.5 rounded-xl border border-white/5">
-                🛡️ Administrative accounts are provisioned by enterprise IT. No public registration available.
-              </p>
-            )}
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#16d9f5] to-[#26e6cf] hover:brightness-110 text-[#020b14] font-black text-sm shadow-[0_0_20px_rgba(22,217,245,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#16d9f5] to-[#26e6cf] hover:brightness-110 disabled:opacity-60 text-[#020b14] font-black text-sm shadow-[0_0_20px_rgba(22,217,245,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              {isLoading ? (
-                <span>Authenticating...</span>
+              {loading ? (
+                <span>Signing in...</span>
               ) : (
                 <>
-                  <span>Sign In as {selectedRole === 'patient' ? 'Patient' : selectedRole === 'doctor' ? 'Doctor' : 'Administrator'}</span>
+                  <span>Log In</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
 
-            {/* Patient Registration Toggle */}
-            {selectedRole === 'patient' && (
-              <div className="pt-2 text-center text-xs text-slate-400">
-                New patient?{' '}
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('register')}
-                  className="font-bold text-[#16d9f5] hover:underline cursor-pointer"
-                >
-                  Create a Patient Account
-                </button>
-              </div>
-            )}
+            <p className="pt-1 text-center text-xs text-slate-400">
+              Don&apos;t have an account?{' '}
+              <button type="button" onClick={() => switchMode('register')} className="font-bold text-[#16d9f5] hover:underline cursor-pointer">
+                Sign Up
+              </button>
+            </p>
           </form>
         ) : (
-          /* PATIENT REGISTRATION FORM */
-          <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs sm:text-sm">
+          /* ---------- SIGN UP FORM ---------- */
+          <form onSubmit={handleRegister} className="space-y-3 text-sm">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Full Legal Name</label>
+              <label htmlFor="reg-name" className="block text-slate-300 font-medium mb-1">
+                Full Name
+              </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
+                  id="reg-name"
                   type="text"
-                  value={registerForm.fullName}
-                  onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
+                  value={reg.fullName}
+                  onChange={(e) => setReg({ ...reg, fullName: e.target.value })}
                   placeholder="e.g. Alex Taylor"
+                  autoComplete="name"
                   required
-                  className="w-full pl-10 pr-3 py-2 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
+                  className={inputCls}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={registerForm.email}
-                  onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                  placeholder="name@carenest.health"
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Phone Number</label>
-                <input
-                  type="tel"
-                  value={registerForm.phone}
-                  onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                  placeholder="(555) 014-2901"
-                  className="w-full px-3 py-2 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Password</label>
-                <input
-                  type="password"
-                  value={registerForm.password}
-                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                  placeholder="Min 8 characters"
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Confirm Password</label>
-                <input
-                  type="password"
-                  value={registerForm.confirmPassword}
-                  onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                  placeholder="Confirm password"
-                  required
-                  className="w-full px-3 py-2 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
-                />
-              </div>
-            </div>
-
-            <div className="pt-1">
-              <label className="flex items-start gap-2 cursor-pointer text-[11px] text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={registerForm.consent}
-                  onChange={(e) => setRegisterForm({ ...registerForm, consent: e.target.checked })}
-                  className="mt-0.5 rounded text-[#16d9f5] focus:ring-[#16d9f5]"
-                />
-                <span>
-                  I consent to the HIPAA privacy terms and authorize creation of my personal digital health portal.
-                </span>
+            <div>
+              <label htmlFor="reg-email" className="block text-slate-300 font-medium mb-1">
+                Email Address
               </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  id="reg-email"
+                  type="email"
+                  value={reg.email}
+                  onChange={(e) => setReg({ ...reg, email: e.target.value })}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  required
+                  className={inputCls}
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="reg-password" className="block text-slate-300 font-medium mb-1">
+                  Password
+                </label>
+                <input
+                  id="reg-password"
+                  type="password"
+                  value={reg.password}
+                  onChange={(e) => setReg({ ...reg, password: e.target.value })}
+                  placeholder="Min 8 characters"
+                  autoComplete="new-password"
+                  required
+                  className="w-full px-3 py-2.5 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-confirm" className="block text-slate-300 font-medium mb-1">
+                  Confirm
+                </label>
+                <input
+                  id="reg-confirm"
+                  type="password"
+                  value={reg.confirmPassword}
+                  onChange={(e) => setReg({ ...reg, confirmPassword: e.target.value })}
+                  placeholder="Repeat password"
+                  autoComplete="new-password"
+                  required
+                  className="w-full px-3 py-2.5 rounded-xl bg-[#071d33] border border-white/15 text-white placeholder:text-slate-500 focus:outline-none focus:border-[#16d9f5]"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-start gap-2 cursor-pointer text-[11px] text-slate-400 pt-1">
+              <input
+                type="checkbox"
+                checked={reg.consent}
+                onChange={(e) => setReg({ ...reg, consent: e.target.checked })}
+                className="mt-0.5 rounded text-[#16d9f5] focus:ring-[#16d9f5]"
+              />
+              <span>I agree to the privacy terms and authorize the creation of my personal health portal.</span>
+            </label>
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#16d9f5] to-[#26e6cf] hover:brightness-110 text-[#020b14] font-black text-sm shadow-[0_0_20px_rgba(22,217,245,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#16d9f5] to-[#26e6cf] hover:brightness-110 disabled:opacity-60 text-[#020b14] font-black text-sm shadow-[0_0_20px_rgba(22,217,245,0.4)] transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              {isLoading ? <span>Creating Account...</span> : <span>Create Patient Account</span>}
+              {loading ? <span>Creating account...</span> : <span>Create Account</span>}
             </button>
 
-            <div className="text-center text-xs text-slate-400 pt-1">
+            <p className="pt-1 text-center text-xs text-slate-400">
               Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className="font-bold text-[#16d9f5] hover:underline cursor-pointer"
-              >
-                Sign in
+              <button type="button" onClick={() => switchMode('login')} className="font-bold text-[#16d9f5] hover:underline cursor-pointer">
+                Log In
               </button>
-            </div>
+            </p>
           </form>
         )}
       </div>

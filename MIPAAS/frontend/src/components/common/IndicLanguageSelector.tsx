@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useIndicLanguage } from '@/context/IndicLanguageContext';
 import { Globe, Check, ChevronDown, Sparkles } from 'lucide-react';
+   
 
 interface IndicLanguageSelectorProps {
   className?: string;
@@ -26,6 +27,7 @@ export default function IndicLanguageSelector({ className = '', compact = false 
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
+         
       <button
         type="button"
         id="mipaas-indic-language-btn"
